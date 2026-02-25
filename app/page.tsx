@@ -8,12 +8,6 @@ import {
   type CSSProperties,
 } from "react";
 
-/**
- * Google Sheets CSV links (published)
- * Leave blank if you only want uploads.
- */
-
-
 type FixedVar = "fixed" | "variable" | undefined;
 
 type Txn = {
@@ -150,36 +144,6 @@ function normalizeFixedVar(x: unknown): FixedVar {
   return undefined;
 }
 
-async function safeFetchText(url: string, signal?: AbortSignal) {
-  const res = await fetch(url, {
-    cache: "no-store",
-    signal,
-    headers: {
-      // Helps some proxies/CDNs behave nicely
-      Accept: "text/csv,text/plain,*/*",
-    },
-  });
-
-  const text = await res.text();
-
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status} fetching CSV`);
-  }
-
-  // Google sometimes returns an HTML "sign in" / "not published" page.
-  // Catch that early with a useful error.
-  const looksLikeHTML =
-    /^\s*</.test(text) && /<html|<body|<!doctype/i.test(text);
-  if (looksLikeHTML) {
-    const snippet = text.slice(0, 160).replace(/\s+/g, " ");
-    throw new Error(
-      `Google returned HTML instead of CSV. Make sure the sheet tab is published to the web. Snippet: ${snippet}`
-    );
-  }
-
-  return text;
-}
-
 function parseBookingsCSV(text: string) {
   const data = parseCSV(text);
 
@@ -191,11 +155,7 @@ function parseBookingsCSV(text: string) {
     const dateRaw = pickRowValue(row, ["Date", "date"]);
     const propRaw = pickRowValue(row, ["Property", "property"]);
     const netRaw = pickRowValue(row, ["Our Net", "OurNet", "our net"]);
-    const feesRaw = pickRowValue(row, [
-      "Fees Due Landmark",
-      "Fees Due",
-      "Fees",
-    ]);
+    const feesRaw = pickRowValue(row, ["Fees Due Landmark", "Fees Due", "Fees"]);
     const sourceRaw = pickRowValue(row, ["Source", "source"]);
 
     const dateISO = toISODate(dateRaw);
@@ -292,13 +252,10 @@ export default function Home() {
   const bookingsRef = useRef<HTMLInputElement | null>(null);
   const expensesRef = useRef<HTMLInputElement | null>(null);
 
-  // Prevent overlapping refreshes (and StrictMode double-invocations in dev)
-  const refreshingRef = useRef(false);
-
   useEffect(() => {
     const ac = new AbortController();
 
-    const run = () => refreshFromGoogleSheets();
+    const run = () => refreshFromGoogleSheets(ac.signal);
     run();
 
     const id = window.setInterval(run, 60_000);
@@ -327,7 +284,9 @@ export default function Home() {
     }
 
     setTxns((prev) => [...prev.filter((t) => t.source !== "booking"), ...all]);
-    setStatus(`Bookings loaded. Rows scanned: ${rows}. Booking txns: ${created}.`);
+    setStatus(
+      `Bookings loaded. Rows scanned: ${rows}. Booking txns: ${created}.`
+    );
   }
 
   async function loadExpenses(files: FileList | null) {
@@ -347,30 +306,32 @@ export default function Home() {
     }
 
     setTxns((prev) => [...prev.filter((t) => t.source !== "expense"), ...all]);
-    setStatus(`Expenses loaded. Rows scanned: ${rows}. Expense txns: ${created}.`);
+    setStatus(
+      `Expenses loaded. Rows scanned: ${rows}. Expense txns: ${created}.`
+    );
   }
 
   async function refreshFromGoogleSheets(signal?: AbortSignal) {
-  try {
-    setStatus("Refreshing from secure server...");
+    try {
+      setStatus("Refreshing from secure server...");
 
-    const res = await fetch(`/api/txns?_t=${Date.now()}`, {
-      cache: "no-store",
-      signal,
-    });
+      const res = await fetch(`/api/txns?_t=${Date.now()}`, {
+        cache: "no-store",
+        signal,
+      });
 
-    const json = await res.json();
-    if (!res.ok) throw new Error(json?.error ?? "API error");
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error ?? "API error");
 
-    const b = await parseBookingsCSV(json.bookingsCSV);
-    const e = await parseExpensesCSV(json.expensesCSV);
+      const b = parseBookingsCSV(json.bookingsCSV);
+      const e = parseExpensesCSV(json.expensesCSV);
 
-    setTxns([...b.txns, ...e.txns]);
-    setStatus(`Live data loaded ✓ (Bookings: ${b.created}, Expenses: ${e.created})`);
-  } catch (err) {
-    setStatus(`Refresh failed: ${(err as Error)?.message ?? String(err)}`);
+      setTxns([...b.txns, ...e.txns]);
+      setStatus(`Live data loaded ✓ (Bookings: ${b.created}, Expenses: ${e.created})`);
+    } catch (err) {
+      setStatus(`Refresh failed: ${(err as Error)?.message ?? String(err)}`);
+    }
   }
-}
 
   const properties = useMemo(() => {
     const set = new Set<string>();
@@ -387,7 +348,8 @@ export default function Home() {
   const report = useMemo(() => {
     const filtered = txns.filter((t) => {
       const monthOk = month === "ALL" ? true : t.month === month;
-      const propOk = propertyFilter === "All" ? true : t.property === propertyFilter;
+      const propOk =
+        propertyFilter === "All" ? true : t.property === propertyFilter;
       return monthOk && propOk;
     });
 
@@ -428,11 +390,26 @@ export default function Home() {
   }, [txns, month, propertyFilter]);
 
   return (
-    <main style={{ maxWidth: 1100, margin: "0 auto", padding: 24, fontFamily: "system-ui" }}>
+    <main
+      style={{
+        maxWidth: 1100,
+        margin: "0 auto",
+        padding: 24,
+        fontFamily: "system-ui",
+      }}
+    >
       <h1 style={{ fontSize: 30, fontWeight: 900 }}>STR Finance Dashboard</h1>
       <div style={{ color: "#aaa", marginTop: 6 }}>{status}</div>
 
-      <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+      <div
+        style={{
+          marginTop: 14,
+          display: "flex",
+          gap: 10,
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
         <input
           ref={bookingsRef}
           type="file"
@@ -463,7 +440,11 @@ export default function Home() {
 
         <label style={{ fontWeight: 800, color: "white" }}>
           Month:&nbsp;
-          <select value={month} onChange={(e) => setMonth(e.target.value)} style={inputStyle()}>
+          <select
+            value={month}
+            onChange={(e) => setMonth(e.target.value)}
+            style={inputStyle()}
+          >
             {months.map((m) => (
               <option key={m} value={m} style={{ color: "black" }}>
                 {m}
@@ -487,10 +468,19 @@ export default function Home() {
           </select>
         </label>
 
-        <div style={{ color: "#aaa", fontSize: 12 }}>Txns in view: {report.count}</div>
+        <div style={{ color: "#aaa", fontSize: 12 }}>
+          Txns in view: {report.count}
+        </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginTop: 16 }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(5, 1fr)",
+          gap: 12,
+          marginTop: 16,
+        }}
+      >
         <Card title="Income" value={fmtUSD(report.income)} />
         <Card title="Expenses" value={fmtUSD(report.expensesAbs)} />
         <Card title="Net" value={fmtUSD(report.net)} />
@@ -499,10 +489,21 @@ export default function Home() {
       </div>
 
       <section style={{ marginTop: 18 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 900, color: "white" }}>By Category (Net)</h2>
-        <div style={{ border: "1px solid #444", borderRadius: 14, marginTop: 10, overflow: "hidden" }}>
+        <h2 style={{ fontSize: 18, fontWeight: 900, color: "white" }}>
+          By Category (Net)
+        </h2>
+        <div
+          style={{
+            border: "1px solid #444",
+            borderRadius: 14,
+            marginTop: 10,
+            overflow: "hidden",
+          }}
+        >
           {report.rows.length === 0 ? (
-            <div style={{ padding: 12, color: "#aaa" }}>No transactions in this selection.</div>
+            <div style={{ padding: 12, color: "#aaa" }}>
+              No transactions in this selection.
+            </div>
           ) : (
             report.rows.map((r, i) => (
               <div
@@ -524,7 +525,8 @@ export default function Home() {
       </section>
 
       <div style={{ marginTop: 10, color: "#777", fontSize: 12 }}>
-        Date ranges like <b>7/14/2025 - 7/25/2025</b> count in the month of the first date (check-in).
+        Date ranges like <b>7/14/2025 - 7/25/2025</b> count in the month of the
+        first date (check-in).
       </div>
     </main>
   );
@@ -555,9 +557,25 @@ function inputStyle(): CSSProperties {
 
 function Card({ title, value }: { title: string; value: string }) {
   return (
-    <div style={{ border: "1px solid #444", borderRadius: 14, padding: 14, background: "#0b0b0b" }}>
+    <div
+      style={{
+        border: "1px solid #444",
+        borderRadius: 14,
+        padding: 14,
+        background: "#0b0b0b",
+      }}
+    >
       <div style={{ color: "#aaa", fontSize: 12, fontWeight: 900 }}>{title}</div>
-      <div style={{ fontSize: 22, fontWeight: 950, marginTop: 8, color: "white" }}>{value}</div>
+      <div
+        style={{
+          fontSize: 22,
+          fontWeight: 950,
+          marginTop: 8,
+          color: "white",
+        }}
+      >
+        {value}
+      </div>
     </div>
   );
 }
