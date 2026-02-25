@@ -354,12 +354,13 @@ export default function Home() {
     setStatus(`Expenses loaded. Rows scanned: ${rows}. Expense txns: ${created}.`);
   }
 
-  async function refreshFromGoogleSheets() {
+  async function refreshFromGoogleSheets(signal?: AbortSignal) {
   try {
     setStatus("Refreshing from secure server...");
 
     const res = await fetch(`/api/txns?_t=${Date.now()}`, {
       cache: "no-store",
+      signal,
     });
 
     const json = await res.json();
