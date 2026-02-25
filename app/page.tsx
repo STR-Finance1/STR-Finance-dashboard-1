@@ -302,7 +302,7 @@ export default function Home() {
   useEffect(() => {
     const ac = new AbortController();
 
-    const run = () => refreshFromGoogleSheets(ac.signal);
+    const run = () => refreshFromGoogleSheets();
     run();
 
     const id = window.setInterval(run, 60_000);
