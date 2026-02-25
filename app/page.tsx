@@ -12,11 +12,7 @@ import {
  * Google Sheets CSV links (published)
  * Leave blank if you only want uploads.
  */
-const BOOKINGS_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vSp05U5ICd_RYWgGMZb2uAa0s9LKky8CEgH_grP1P82FzUi1p2i_VyPCBZw_XOhTPVB3dA36WYOLeKm/pub?gid=0&single=true&output=csv";
 
-const EXPENSES_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vSp05U5ICd_RYWgGMZb2uAa0s9LKky8CEgH_grP1P82FzUi1p2i_VyPCBZw_XOhTPVB3dA36WYOLeKm/pub?gid=1482291786&single=true&output=csv";
 
 type FixedVar = "fixed" | "variable" | undefined;
 
