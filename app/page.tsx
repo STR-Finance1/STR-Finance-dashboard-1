@@ -354,47 +354,26 @@ export default function Home() {
     setStatus(`Expenses loaded. Rows scanned: ${rows}. Expense txns: ${created}.`);
   }
 
-  async function refreshFromGoogleSheets(signal?: AbortSignal) {
-    if (!BOOKINGS_URL || !EXPENSES_URL) {
-      setStatus(
-        "Add BOOKINGS_URL and EXPENSES_URL at the top of page.tsx to enable refresh."
-      );
-      return;
-    }
-    if (refreshingRef.current) return;
+  async function refreshFromGoogleSheets() {
+  try {
+    setStatus("Refreshing from secure server...");
 
-    refreshingRef.current = true;
-    try {
-      setStatus("Refreshing from Google Sheets...");
+    const res = await fetch(`/api/txns?_t=${Date.now()}`, {
+      cache: "no-store",
+    });
 
-      const cacheBust = `_t=${Date.now()}`;
-      const bookingsText = await safeFetchText(
-        BOOKINGS_URL.includes("?")
-          ? `${BOOKINGS_URL}&${cacheBust}`
-          : `${BOOKINGS_URL}?${cacheBust}`,
-        signal
-      );
+    const json = await res.json();
+    if (!res.ok) throw new Error(json?.error ?? "API error");
 
-      const expensesText = await safeFetchText(
-        EXPENSES_URL.includes("?")
-          ? `${EXPENSES_URL}&${cacheBust}`
-          : `${EXPENSES_URL}?${cacheBust}`,
-        signal
-      );
+    const b = await parseBookingsCSV(json.bookingsCSV);
+    const e = await parseExpensesCSV(json.expensesCSV);
 
-      const b = parseBookingsCSV(bookingsText);
-      const e = parseExpensesCSV(expensesText);
-
-      setTxns([...b.txns, ...e.txns]);
-      setStatus(`Live data loaded ✓ (Bookings: ${b.created}, Expenses: ${e.created})`);
-    } catch (err) {
-      // Abort is normal during unmount / navigation
-      if ((err as any)?.name === "AbortError") return;
-      setStatus(`Refresh failed: ${(err as Error)?.message ?? String(err)}`);
-    } finally {
-      refreshingRef.current = false;
-    }
+    setTxns([...b.txns, ...e.txns]);
+    setStatus(`Live data loaded ✓ (Bookings: ${b.created}, Expenses: ${e.created})`);
+  } catch (err) {
+    setStatus(`Refresh failed: ${(err as Error)?.message ?? String(err)}`);
   }
+}
 
   const properties = useMemo(() => {
     const set = new Set<string>();
