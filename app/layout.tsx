@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -24,11 +25,29 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
-      </body>
+<body
+  className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+>
+  <header
+    style={{
+      display: "flex",
+      gap: 12,
+      padding: 12,
+      borderBottom: "1px solid #ddd",
+    }}
+  >
+    <strong>STR Finance</strong>
+
+    <nav style={{ marginLeft: "auto", display: "flex", gap: 12 }}>
+      <Link href="/">Main</Link>
+      <Link href="/owner">Owner</Link>
+    </nav>
+  </header>
+
+  <main style={{ padding: 12 }}>
+    {children}
+  </main>
+</body>
     </html>
   );
 }

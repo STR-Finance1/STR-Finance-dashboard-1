@@ -9,6 +9,8 @@ function reqEnv(name: string) {
 }
 
 async function getAccessToken() {
+    console.log("TOKEN:", process.env.GOOGLE_REFRESH_TOKEN);
+    
   const client_id = reqEnv("GOOGLE_OAUTH_CLIENT_ID");
   const client_secret = reqEnv("GOOGLE_OAUTH_CLIENT_SECRET");
   const refresh_token = reqEnv("GOOGLE_OAUTH_REFRESH_TOKEN");
